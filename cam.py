@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-
+#blablatest
 import time
 import picamera
 
@@ -13,3 +13,4 @@ time.sleep(100)
 camera.stop_preview()
 camera.close()
 
+#bbqjb
