@@ -11,7 +11,7 @@ etat=True # Variable d'état ON/OFF du serveur
 Liste_Client=[] # Liste de tout les clients connectés sur le serveur
 
 
-def Lecture_Client(client,adresse,numero):
+def Lecture_Client(client,adresse):
     # Fonction de lecture du client
     global etat 
     global Liste_Client
@@ -24,20 +24,21 @@ def Lecture_Client(client,adresse,numero):
     while msg_recu!="STOP" and msg_recu!="fin":
         
         # La lecture se ferme si le msg est "fin" ou "STOP"
+        try :
+            msg_recu = client.recv(1024)
+            msg_recu = msg_recu.decode()
         
-        msg_recu = client.recv(1024)
-        msg_recu = msg_recu.decode()
+            print("Client {}".format(adresse))
+            print("Reçu : {}\n".format(msg_recu))
         
-        print("Client {}".format(adresse))
-        print("Reçu : {}\n".format(msg_recu))
+            client.send(b"5 / 5")
         
-        client.send(b"5 / 5")
+        except :
+            break
     
         if msg_recu=="STOP":        # Si le serveur reçois "STOP", le serveur se termine
             etat=False
     
-    Liste_Client[numero]=None
-    client.close()
     print("\n:::::::::::::::::::::::::")
     print("\nIP : {}".format(adresse))
     print(":: Connexion sortante ::")
@@ -56,17 +57,29 @@ print(":: Port de connexion {} ::".format(port))
 while etat==True:
     
     Liste_Connexion, wlist, xlist = select.select([serveur],[],[],0.1)
+    
     for Connexion in Liste_Connexion:
+        
         Client, Adresse = serveur.accept()      # Ouverture d'une connexion
         Liste_Client.append(Client)
-        Numero=len(Liste_Client)-1
-        threading._start_new_thread(Lecture_Client,(Client,Adresse,Numero))
-        # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
+        
+        try :
+            threading._start_new_thread(Lecture_Client,(Client,Adresse,))
+            # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
+        except :
+            pass
+
     
 print(":: Fermeture du Serveur ::")
+
 for Client_Restant in Liste_Client :
-    if Client_Restant!=None:
+    
+    try:    
         Client_Restant.close()
+        
+    except:
+        pass
+
 serveur.close()     # Fermeture du serveur 
         
         
