@@ -4,6 +4,10 @@
 import socket
 import threading
 import select
+import keyboard
+import struct
+import io
+from PIL import Image
 
 host='0.0.0.0'
 port=8000
@@ -14,33 +18,45 @@ Liste_Client=[] # Liste de tout les clients connectés sur le serveur
 def Lecture_Client(client,adresse):
     # Fonction de lecture du client
     global etat 
-    global Liste_Client
     
     print("\n:: Connexion rentrante :: \nIP : {}" .format(adresse))
     print(":::::::::::::::::::::::::\n")
     
-    msg_recu=""
+    i=0
     
-    while msg_recu!="STOP" and msg_recu!="fin":
+    while etat==True:
         
-        # La lecture se ferme si le msg est "fin" ou "STOP"
+        i+=1
+        
+        if keyboard.is_pressed("q"):
+            etat=False
+            # Pour sortir de la boucle il faut presser la touche 'q'
+                
         try :
-            msg_recu = client.recv(1024)
-            msg_recu = msg_recu.decode()
-        
-            print("Client {}".format(adresse))
-            print("Reçu : {}\n".format(msg_recu))
-        
-            client.send(b"5 / 5")
+            
+            image_len = struct.unpack('<L', client.read(4))[0]
+            # On recupère la taille de l'image codé sur 32-bits non signé
+            
+            if not image_len:
+                break
+                # Si le client lui envoi une longueur de 0 -> on arrête la lecture
+            
+            image_stream = io.BytesIO()
+            # On créer le stream pour recevoir les datas
+            image_stream.write(client.read(image_len))
+            # On recupère l'image envoyé par le client dans le stream
+            # On créer un fichier pour sauvegarder l'image sur le serveur
+            image_stream.seek(0)
+            image = Image.open(image_stream)
+            num_id=str(adresse[1]+i)
+            image.save("IMG" + num_id + ".jpg")
         
         except :
+            print("\n:::::::::::::::::::::::::\n:: Erreur de lecture ::")
             break
     
-        if msg_recu=="STOP":        # Si le serveur reçois "STOP", le serveur se termine
-            etat=False
-    
     print("\n:::::::::::::::::::::::::")
-    print("\nIP : {}".format(adresse))
+    print("IP : {}".format(adresse))
     print(":: Connexion sortante ::")
     
     return 0
@@ -61,6 +77,7 @@ while etat==True:
     for Connexion in Liste_Connexion:
         
         Client, Adresse = serveur.accept()      # Ouverture d'une connexion
+        Client.makefile('rb')
         Liste_Client.append(Client)
         
         try :
@@ -69,19 +86,15 @@ while etat==True:
         except :
             pass
 
-    
-print(":: Fermeture du Serveur ::")
+print("\n:::::::::::::::::::::::::")    
+print(":: Fermeture du Serveur ::\n:::::::::::::::::::::::::")
 
 for Client_Restant in Liste_Client :
     
     try:    
         Client_Restant.close()
-        
+        # On ferme toute les connexions clients
     except:
         pass
 
 serveur.close()     # Fermeture du serveur 
-        
-        
-        
-    
