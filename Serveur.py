@@ -10,6 +10,7 @@ import io
 from PIL import Image
 from PIL import ImageFile
 from image_slicer import join
+import time
 
 host='0.0.0.0'
 port=8000
@@ -35,7 +36,7 @@ def Lecture_Client(client,adresse):
         # try :
         image_len=1
         print("Image_len {}" .format(image_len)) 
-        image_len = struct.unpack('<L', client.recv(4))[0]
+        image_len = struct.unpack('<L', client.read(4))[0]
             # On recupère la taille de l'image codé sur 1024-bits non signé
         print("Image_len {}" .format(image_len))     
         print(i)
@@ -46,7 +47,7 @@ def Lecture_Client(client,adresse):
         print("Image_len {}" .format(image_len))    
         image_stream = io.BytesIO()
             # On créer le stream pour recevoir les datas
-        image_stream.write(client.recv(image_len))
+        image_stream.write(client.read(image_len))
             # On recupère l'image envoyé par le client dans le stream
             # On créer un fichier pour sauvegarder l'image sur le serveur
         image_stream.seek(0)
@@ -57,8 +58,7 @@ def Lecture_Client(client,adresse):
         image = Image.open(image_stream).convert("RGB")
         image.save("IMG" + str(adresse[1]) + "_" + str(i) + ".jpeg")
         
-        del image_len
-                
+        del image_len        
         # except :
         #     print("\n:::::::::::::::::::::::::\n::  Erreur de lecture  ::")
         #     break
@@ -89,11 +89,14 @@ while etat==True:
     for Connexion in Liste_Connexion:
         
         Client, Adresse = serveur.accept()      # Ouverture d'une connexion
-        Client.makefile('rb')
-        Liste_Client.append(Client)
+        
+        Client_Co=Client.makefile('rb')
+        
+        print(type(Client_Co))
+        Liste_Client.append(Client_Co)
         
         try :
-            threading._start_new_thread(Lecture_Client,(Client,Adresse,))
+            threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
             # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
         except :
             pass
