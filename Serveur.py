@@ -1,25 +1,71 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import socket
-import select
 import threading
+import select
+import keyboard
+import struct
+import io
+from PIL import Image
+from PIL import ImageFile
+from image_slicer import join
+import time
 
 host='0.0.0.0'
 port=8000
-etat=True
+etat=True # Variable d'état ON/OFF du serveur
+Liste_Client=[] # Liste de tout les clients connectés sur le serveur
+
+ImageFile.LOAD_TRUNCATED_IMAGES=True
+
 
 def Lecture_Client(client,adresse):
+    # Fonction de lecture du client
+    global etat 
     
     print("\n:: Connexion rentrante :: \nIP : {}" .format(adresse))
+    print(":::::::::::::::::::::::::\n")
     
-    msg_recu = client.recv(1024)
-    msg_recu = msg_recu.decode()
+    i=0
     
-    print("Reçu : {}".format(msg_recu))
+    while etat==True:
+        
+        i+=1
+                
+        # try :
+        image_len=1
+        print("Image_len {}" .format(image_len)) 
+        image_len = struct.unpack('<L', client.read(4))[0]
+            # On recupère la taille de l'image codé sur 1024-bits non signé
+        print("Image_len {}" .format(image_len))     
+        print(i)
+            
+        if not image_len:
+            break
+                # Si le client lui envoi une longueur de 0 -> on arrête la lecture
+        print("Image_len {}" .format(image_len))    
+        image_stream = io.BytesIO()
+            # On créer le stream pour recevoir les datas
+        image_stream.write(client.read(image_len))
+            # On recupère l'image envoyé par le client dans le stream
+            # On créer un fichier pour sauvegarder l'image sur le serveur
+        image_stream.seek(0)
+        
+        print(type(image_stream))
+        print(image_stream)
+        
+        image = Image.open(image_stream).convert("RGB")
+        image.save("IMG" + str(adresse[1]) + "_" + str(i) + ".jpeg")
+        
+        del image_len        
+        # except :
+        #     print("\n:::::::::::::::::::::::::\n::  Erreur de lecture  ::")
+        #     break
     
-    client.send(b"5 / 5")
-    
-    if msg_recu=="STOP":
-        etat=False
-    
+    print("\n:::::::::::::::::::::::::")
+    print("IP : {}".format(adresse))
+    print(":: Connexion  sortante ::")
     
     return 0
 
@@ -28,20 +74,42 @@ def Lecture_Client(client,adresse):
 serveur = socket.socket()               # Création du serveur socket
 serveur.bind((host, port))                # Création du lien de connexion
 serveur.listen(5)
+
+print("::: Ouverture du Serveur :::")    
+print(":: Port de connexion {} ::".format(port))
+
+while etat==True:
     
-print("Le serveur écoute à présent sur le port {}".format(port))
+    Liste_Connexion, wlist, xlist = select.select([serveur],[],[],0.1)
     
-while etat:
+    if keyboard.is_pressed("q"):
+        etat=False
+    # Pour sortir de la boucle il faut presser la touche 'q'
     
-    try:
-        Client, Adresse = serveur.accept()
-        Lecture_Client(Client,Adresse)
+    for Connexion in Liste_Connexion:
         
+        Client, Adresse = serveur.accept()      # Ouverture d'une connexion
+        
+        Client_Co=Client.makefile('rb')
+        
+        print(type(Client_Co))
+        Liste_Client.append(Client_Co)
+        
+        try :
+            threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
+            # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
+        except :
+            pass
+
+print("\n::::::::::::::::::::::::::")    
+print(":: Fermeture du Serveur ::\n::::::::::::::::::::::::::")
+
+for Client_Restant in Liste_Client :
+    
+    try:    
+        Client_Restant.close()
+        # On ferme toute les connexions clients
     except:
         pass
 
-serveur.close()
-        
-        
-        
-    
+serveur.close()     # Fermeture du serveur 
