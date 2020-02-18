@@ -10,6 +10,7 @@ import io
 from PIL import Image
 from PIL import ImageFile
 import time
+import numpy as np
 
 host='0.0.0.0'
 port=8000
@@ -40,6 +41,7 @@ def Consigne_Clients(Liste_Client, msg):
 def Lecture_Client(client,adresse):
     # Fonction de lecture du client
     global etat 
+    global Liste_IP
     Nom=Lecture_Nom(adresse[0])
     i=0
     
@@ -75,6 +77,9 @@ def Lecture_Client(client,adresse):
         #     print("\n:::::::::::::::::::::::::\n::  Erreur de lecture  ::")
         #     break
     
+    
+    x,y=np.where(Liste_IP==Nom)
+    Liste_IP=np.delete(Liste_IP,x[0],axis=0)
     print("\n:: Client n°{} déconnecté ::" .format(Nom))
     
     return 0
@@ -124,9 +129,6 @@ while etat==True:
         except :
             pass
 
-print("\n::::::::::::::::::::::::::")    
-print(":: Fermeture du Serveur ::\n::::::::::::::::::::::::::")
-
 for Client_Restant in Liste_Client :
     
     try:    
@@ -136,3 +138,6 @@ for Client_Restant in Liste_Client :
         pass
 
 serveur.close()     # Fermeture du serveur 
+
+print("\n::::::::::::::::::::::::::")    
+print(":: Fermeture du Serveur ::\n::::::::::::::::::::::::::")
