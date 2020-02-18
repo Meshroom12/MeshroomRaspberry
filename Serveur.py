@@ -9,42 +9,57 @@ import struct
 import io
 from PIL import Image
 from PIL import ImageFile
-from image_slicer import join
 import time
 
 host='0.0.0.0'
 port=8000
 etat=True # Variable d'état ON/OFF du serveur
 Liste_Client=[] # Liste de tout les clients connectés sur le serveur
+Liste_IP=[]
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
+def Lecture_Nom(IP):
+    MON=str()
+    k=1
+    while IP[-k]!=".":
+        MON+=IP[-k]
+        k+=1
+    if len(MON)==2:
+        MON+="0"
+    NOM=''.join(reversed(MON))
+    return NOM
+    
+    
+def Consigne_Clients(Liste_Client, msg):
+    for Cl in Liste_Client :
+        Cl.send(msg)
+    
+    return 0
 
 def Lecture_Client(client,adresse):
     # Fonction de lecture du client
     global etat 
-    
-    print("\n:: Connexion rentrante :: \nIP : {}" .format(adresse))
-    print(":::::::::::::::::::::::::\n")
-    
+    Nom=Lecture_Nom(adresse[0])
     i=0
+    
+    print(":: Client n°{} connecté ::" .format(Nom))
     
     while etat==True:
         
         i+=1
                 
         # try :
-        image_len=1
-        print("Image_len {}" .format(image_len)) 
         image_len = struct.unpack('<L', client.read(4))[0]
             # On recupère la taille de l'image codé sur 1024-bits non signé
-        print("Image_len {}" .format(image_len))     
-        print(i)
+        
             
         if not image_len:
             break
                 # Si le client lui envoi une longueur de 0 -> on arrête la lecture
-        print("Image_len {}" .format(image_len))    
+        
+        print("Client : {}" .format(Nom), ":: Photo n°{}" .format(i))
+        #print("Image_len = {}" .format(image_len))
         image_stream = io.BytesIO()
             # On créer le stream pour recevoir les datas
         image_stream.write(client.read(image_len))
@@ -52,20 +67,15 @@ def Lecture_Client(client,adresse):
             # On créer un fichier pour sauvegarder l'image sur le serveur
         image_stream.seek(0)
         
-        print(type(image_stream))
-        print(image_stream)
-        
         image = Image.open(image_stream).convert("RGB")
-        image.save("IMG" + str(adresse[1]) + "_" + str(i) + ".jpeg")
+        image.save("IMG" + Nom + "_" + str(i) + ".jpeg")
         
         del image_len        
         # except :
         #     print("\n:::::::::::::::::::::::::\n::  Erreur de lecture  ::")
         #     break
     
-    print("\n:::::::::::::::::::::::::")
-    print("IP : {}".format(adresse))
-    print(":: Connexion  sortante ::")
+    print("\n:: Client n°{} déconnecté ::" .format(Nom))
     
     return 0
 
@@ -76,7 +86,7 @@ serveur.bind((host, port))                # Création du lien de connexion
 serveur.listen(5)
 
 print("::: Ouverture du Serveur :::")    
-print(":: Port de connexion {} ::".format(port))
+print(":: Port de connexion {} ::\n".format(port))
 
 while etat==True:
     
@@ -84,16 +94,29 @@ while etat==True:
     
     if keyboard.is_pressed("q"):
         etat=False
+        msg=b"stop"
+        Consigne_Clients(Liste_Client, msg)
     # Pour sortir de la boucle il faut presser la touche 'q'
+        
+    if keyboard.is_pressed("p"):
+        msg=b"photo"
+        Consigne_Clients(Liste_Client, msg)
+        time.sleep(0.5)
+        
+    if keyboard.is_pressed("l"):
+        
+        print("\n:: Liste des clients connectés ::\n_______________________________________________________")
+        for addr in Liste_IP:
+            print("  Nom : {}\t".format(Lecture_Nom(addr[0])), "IP : {}\t".format(addr[0]), "Port : {}".format(addr[1]))
+        print("\n")
     
     for Connexion in Liste_Connexion:
         
         Client, Adresse = serveur.accept()      # Ouverture d'une connexion
-        
         Client_Co=Client.makefile('rb')
-        
-        print(type(Client_Co))
-        Liste_Client.append(Client_Co)
+        Liste_Client.append(Client)
+        Liste_IP.append(Adresse)
+        time.sleep(0.5)
         
         try :
             threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
