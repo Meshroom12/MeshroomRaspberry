@@ -6,6 +6,8 @@ import RPi.GPIO as GPIO
 
 def Init_GPIO():
     
+    GPIO.setwarnings(False)
+    
     #Definition des variables globales
     global StepPins
     global WaitTime
