@@ -11,6 +11,7 @@ from PIL import Image
 from PIL import ImageFile
 import time
 import numpy as np
+import Motor as m
 
 host='0.0.0.0'
 port=8000
@@ -19,6 +20,10 @@ Liste_Client=[] # Liste de tout les clients connectés sur le serveur
 Liste_IP=[]
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
+
+def Nb_photos():
+    n=input("Nombre de photos : ")
+    return n
 
 def Lecture_Nom(IP):
     MON=str()
@@ -42,6 +47,10 @@ def Lecture_Client(client,adresse):
     # Fonction de lecture du client
     global etat 
     global Liste_IP
+    global Nb_Ph
+    global Client_fini
+    global Cpt
+    
     Nom=Lecture_Nom(adresse[0])
     i=0
     
@@ -72,11 +81,23 @@ def Lecture_Client(client,adresse):
         image = Image.open(image_stream).convert("RGB")
         image.save("IMG" + Nom + "_" + str(i) + ".jpeg")
         
+        Client_fini+=1
+        # Dès que la photo est prise, on incrémente Client_fini de 1
+        # Tant que cette variable n'est pas égale au nombre de client, on attend.        
+        while Client_fini != len(Liste_IP):
+            time.sleep(0.25)
+        
         del image_len        
         # except :
         #     print("\n:::::::::::::::::::::::::\n::  Erreur de lecture  ::")
         #     break
-    
+        
+        
+        if Cpt==Nb_Ph:
+            while Cpt!=0:
+                time.sleep(0.1)
+                # Dès que le nombre de photo (par client) correspond à ce qui était voulu,
+                # on attend un reset.
     
     x,y=np.where(Liste_IP==Nom)
     Liste_IP=np.delete(Liste_IP,x[0],axis=0)
@@ -93,9 +114,27 @@ serveur.listen(5)
 print("::: Ouverture du Serveur :::")    
 print(":: Port de connexion {} ::\n".format(port))
 
+Nb_Ph=Nb_photos()
+Client_fini=0
+Cpt=0
+
 while etat==True:
     
     Liste_Connexion, wlist, xlist = select.select([serveur],[],[],0.1)
+    
+    if Client_fini == len(Liste_IP):
+        # Dès que tout les clients ont pris leur photo, on réalise la rotation
+        m.Rotation(1./Nb_Ph)
+        # On réinitialise le compteur Client_fini et on incrémente Cpt de 1
+        Client_fini=0
+        Cpt=+1
+    
+    if Cpt==Nb_Ph:
+        # Dès que Cpt==Nb_Ph, ça veut dire qu'on a pris toute les photos
+        time.sleep(0.5)
+        # On attend juste une nouvelle valeur pour recommencer.
+        Nb_Ph=Nb_photos()
+        Cpt=0
     
     if keyboard.is_pressed("q"):
         etat=False
