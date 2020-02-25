@@ -50,9 +50,11 @@ def Lecture_Client(client,adresse):
     global Nb_Ph
     global Client_fini
     global Cpt
+    global T
     
     Nom=Lecture_Nom(adresse[0])
     i=0
+    
     
     print(":: Client n°{} connecté ::" .format(Nom))
     
@@ -60,44 +62,46 @@ def Lecture_Client(client,adresse):
         
         i+=1
                 
-        # try :
-        image_len = struct.unpack('<L', client.read(4))[0]
-            # On recupère la taille de l'image codé sur 1024-bits non signé
-        
+        try :
+            image_len = struct.unpack('<L', client.read(4))[0]
+                # On recupère la taille de l'image codé sur 1024-bits non signé
             
-        if not image_len:
+                
+            if not image_len:
+                break
+                    # Si le client lui envoi une longueur de 0 -> on arrête la lecture
+            
+            print("Client : {}" .format(Nom), ":: Photo n°{}" .format(i))
+            #print("Image_len = {}" .format(image_len))
+            image_stream = io.BytesIO()
+                # On créer le stream pour recevoir les datas
+            image_stream.write(client.read(image_len))
+                # On recupère l'image envoyé par le client dans le stream
+                # On créer un fichier pour sauvegarder l'image sur le serveur
+            image_stream.seek(0)
+            
+            image = Image.open(image_stream).convert("RGB")
+            image.save("IMG" + "_" + T + "_" + Nom + "_" + str(i) + ".jpeg")
+            
+            Client_fini+=1
+            # Dès que la photo est prise, on incrémente Client_fini de 1
+            # Tant que cette variable n'est pas égale au nombre de client, on attend.        
+            while Client_fini != len(Liste_IP):
+                time.sleep(0.25)
+            
+            del image_len  
+            
+            if Cpt==Nb_Ph:
+                while Cpt!=0:
+                    time.sleep(0.1)
+                    # Dès que le nombre de photo (par client) correspond à ce qui était voulu,
+                    # on attend un reset.
+        except :
+            print("\n::  Erreur de lecture  ::\n:: Client n°{} ::\n" .format(Nom))
             break
-                # Si le client lui envoi une longueur de 0 -> on arrête la lecture
-        
-        print("Client : {}" .format(Nom), ":: Photo n°{}" .format(i))
-        #print("Image_len = {}" .format(image_len))
-        image_stream = io.BytesIO()
-            # On créer le stream pour recevoir les datas
-        image_stream.write(client.read(image_len))
-            # On recupère l'image envoyé par le client dans le stream
-            # On créer un fichier pour sauvegarder l'image sur le serveur
-        image_stream.seek(0)
-        
-        image = Image.open(image_stream).convert("RGB")
-        image.save("IMG" + Nom + "_" + str(i) + ".jpeg")
-        
-        Client_fini+=1
-        # Dès que la photo est prise, on incrémente Client_fini de 1
-        # Tant que cette variable n'est pas égale au nombre de client, on attend.        
-        while Client_fini != len(Liste_IP):
-            time.sleep(0.25)
-        
-        del image_len        
-        # except :
-        #     print("\n:::::::::::::::::::::::::\n::  Erreur de lecture  ::")
-        #     break
         
         
-        if Cpt==Nb_Ph:
-            while Cpt!=0:
-                time.sleep(0.1)
-                # Dès que le nombre de photo (par client) correspond à ce qui était voulu,
-                # on attend un reset.
+
     
     x,y=np.where(Liste_IP==Nom)
     Liste_IP=np.delete(Liste_IP,x[0],axis=0)
@@ -117,6 +121,7 @@ print(":: Port de connexion {} ::\n".format(port))
 Nb_Ph=Nb_photos()
 Client_fini=0
 Cpt=0
+T=hex(int(time.time()))[6:10]
 
 while etat==True:
     
@@ -134,6 +139,7 @@ while etat==True:
         time.sleep(0.5)
         # On attend juste une nouvelle valeur pour recommencer.
         Nb_Ph=Nb_photos()
+        T=hex(int(time.time()))[6:10]
         Cpt=0
     
     if keyboard.is_pressed("q"):
