@@ -122,7 +122,7 @@ print(":: Port de connexion {} ::\n".format(port))
 
 Nb_Ph=Nb_photos()
 Client_fini=0
-Cpt=1
+Cpt=0
 T=hex(int(time.time()))[6:10]
 
 while etat==True:
