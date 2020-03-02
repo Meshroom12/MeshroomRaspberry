@@ -19,6 +19,8 @@ etat=True # Variable d'état ON/OFF du serveur
 Liste_Client=[] # Liste de tout les clients connectés sur le serveur
 Liste_IP=[]
 
+m.Init_GPIO()   # Initialisation des GPIOs
+
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
 def Nb_photos():
@@ -120,7 +122,7 @@ print(":: Port de connexion {} ::\n".format(port))
 
 Nb_Ph=Nb_photos()
 Client_fini=0
-Cpt=0
+Cpt=1
 T=hex(int(time.time()))[6:10]
 
 while etat==True:
@@ -132,7 +134,7 @@ while etat==True:
         m.Rotation(1./Nb_Ph)
         # On réinitialise le compteur Client_fini et on incrémente Cpt de 1
         Client_fini=0
-        Cpt=+1
+        Cpt+=1
     
     if Cpt==Nb_Ph:
         # Dès que Cpt==Nb_Ph, ça veut dire qu'on a pris toute les photos
@@ -183,6 +185,7 @@ for Client_Restant in Liste_Client :
         pass
 
 serveur.close()     # Fermeture du serveur 
+m.Close_GPIO()      # Fermeture des GPIOs
 
 print("\n::::::::::::::::::::::::::")    
 print(":: Fermeture du Serveur ::\n::::::::::::::::::::::::::")
