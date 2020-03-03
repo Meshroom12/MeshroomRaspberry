@@ -18,9 +18,9 @@ def Init_GPIO():
     
     # Utilisation de BCM pour les GPIOs
     GPIO.setmode(GPIO.BCM)
-    # Définitions des GPIOs sur les Pins 18,22,24,26 -> GPIO24,GPIO25,GPIO8,GPIO7
+    # Définitions des GPIOs sur les Pins 37,35,33,31 -> GPIO26,GPIO19,GPIO13,GPIO6
     
-    StepPins = [24,25,8,7]
+    StepPins = [26,19,13,6]
     # Paramétrage des Pins en sortie
     for pin in StepPins:
            #print ("Setup pins")
@@ -53,6 +53,9 @@ def Init_GPIO():
     Seq2[7] = [1,0,0,1]
 
 def steps(nb,num_seq):
+    
+    global Seq1
+    global Seq2
     
     # Paramétrage en fonction du choix de la séquence
     if num_seq==1 :

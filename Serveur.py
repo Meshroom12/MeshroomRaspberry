@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
 import socket
 import threading
+from threading import Thread, RLock
 import select
 import keyboard
 import struct
@@ -23,35 +25,88 @@ m.Init_GPIO()   # Initialisation des GPIOs
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
-def wait(Var_Bool,Condition_Bool):
-    while Var_Bool==Condition_Bool:
-        time.sleep(0.1)
+verrou = RLock()
+
+def mode_auto():
+    global etat
+    global Nb_Ph
+    global Cpt
+    global Rot
+    global Client_fini
+    global T
+    
+    msg=b'photo'
+    a=True
+    
+    while etat:
+        if Nb_Clients==len(Liste_Client):
+            if a:
+                time.sleep(2)
+                logging.debug("Les clients sont tous connectés")
+                a=False
+            
+            Consigne_Clients(Liste_Client, msg)
+            logging.info("Consigne (prendre photo) envoyé")
+            
+            while Client_fini != len(Liste_IP):
+                time.sleep(0.1)
+            
+            # Dès que tout les clients ont pris leur photo, on réalise la rotation
+            Rot=True
+            m.Rotation(1./Nb_Ph)
+            logging.debug("Rotation du support")
+            time.sleep(0.5)
+            Rot=False
+            # On réinitialise le compteur Client_fini et on incrémente Cpt de 1
+            Client_fini=0
+            Cpt+=1
+            
+            if Cpt==Nb_Ph:
+                # Dès que Cpt==Nb_Ph, ça veut dire qu'on a pris toute les photos
+                time.sleep(0.5)
+                logging.info("Processus terminé : Toutes les photos ont été prises")
+                # On attend juste une nouvelle valeur pour recommencer.
+                Nb_Ph=Nb_photos()
+                T=hex(int(time.time()))[6:10]
+                Cpt=0
 
 def clavier():
     
     global etat
+    global Rot
     
     while etat==True:
-        if keyboard.press_and_release("q"):
+        if keyboard.is_pressed("q"):
+            while keyboard.is_pressed("q"):
+                time.sleep(0.1)
             etat=False
             msg=b"stop"
             Consigne_Clients(Liste_Client, msg)
+            logging.warning("Commande manuelle : Arret du système")
         # Pour sortir de la boucle il faut presser la touche 'q'
             
-        if keyboard.press_and_release("l"):
+        if keyboard.is_pressed("l"):
+            while keyboard.is_pressed("l"):
+                time.sleep(0.1)
             print("\n:: Liste des clients connectés ::\n_______________________________________________________")
             for addr in Liste_IP:
                 print("  Nom : {}\t".format(Lecture_Nom(addr[0])), "IP : {}\t".format(addr[0]), "Port : {}".format(addr[1]))
             print("\n")
+            logging.warning("Commande manuelle : Liste des RPi clients")
             
-        if keyboard.press_and_release("p"):
-            wait(Rot,True)
+        if keyboard.is_pressed("p"):
+            while keyboard.is_pressed("p"):
+                time.sleep(0.1)
+            while Rot:
+                time.sleep(0.1)
             msg=b"photo"
             Consigne_Clients(Liste_Client, msg)
-    
+            logging.warning("Commande manuelle : Photo")
+            time.sleep(2)
 
 def Nb_photos():
     n=input("Nombre de photos : ")
+    logging.debug("Choix du nombre de photo = "+str(n))
     return n
 
 def Lecture_Nom(IP):
@@ -80,13 +135,11 @@ def Lecture_Client(client,adresse):
     global Client_fini
     global Cpt
     global T
-    global Rot
     
     Nom=Lecture_Nom(adresse[0])
     i=0
     
-    
-    print(":: Client n°{} connecté ::" .format(Nom))
+    logging.info("Connexion du client n°"+Nom)    
     
     while etat==True:
         
@@ -99,9 +152,8 @@ def Lecture_Client(client,adresse):
                 
             if not image_len:
                 break
-                    # Si le client lui envoi une longueur de 0 -> on arrête la lecture
+                # Si le client lui envoi une longueur de 0 -> on arrête la lecture
             
-            print("Client : {}" .format(Nom), ":: Photo n°{}" .format(i))
             #print("Image_len = {}" .format(image_len))
             image_stream = io.BytesIO()
                 # On créer le stream pour recevoir les datas
@@ -111,7 +163,9 @@ def Lecture_Client(client,adresse):
             image_stream.seek(0)
             
             image = Image.open(image_stream).convert("RGB")
-            image.save("IMG" + "_" + T + "_" + Nom + "_" + str(i) + ".jpeg")
+            image.save("/home/pi/Desktop/Serveur/Images_Mesh/IMG" + "_" + T + "_" + Nom + "_" + str(i) + ".jpeg")
+            
+            logging.debug("Le client n°"+Nom+" à pris sa "+str(i)+"ème photo")
             
             Client_fini+=1
             # Dès que la photo est prise, on incrémente Client_fini de 1
@@ -120,41 +174,41 @@ def Lecture_Client(client,adresse):
                 time.sleep(0.25)
             
             del image_len  
-            
+        
             if Cpt==Nb_Ph:
                 while Cpt!=0:
                     time.sleep(0.1)
                     # Dès que le nombre de photo (par client) correspond à ce qui était voulu,
                     # on attend un reset.
         except :
-            print("\n::  Erreur de lecture  ::\n:: Client n°{} ::\n" .format(Nom))
+            logging.error("Erreur dans la reception et sauvegarde de l'image IMG_"+T+"_"+Nom+"_"+str(i)+".jpeg")
             break
-        
-        
-
-    
-    x,y=np.where(Liste_IP==Nom)
-    Liste_IP=np.delete(Liste_IP,x[0],axis=0)
-    print("\n:: Client n°{} déconnecté ::" .format(Nom))
+    if etat:
+        logging.critical("Connexion perdu avec le client n°"+Nom)
+    else:
+        logging.debug("Client " + Nom + " déconnecté")
     
     return 0
 
-
+T=hex(int(time.time()))[6:10]
+logging.basicConfig(filename='log_'+T+'.log',level=logging.DEBUG,format='%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
 
 serveur = socket.socket()               # Création du serveur socket
 serveur.bind((host, port))                # Création du lien de connexion
 serveur.listen(5)
 
-print("::: Ouverture du Serveur :::")    
-print(":: Port de connexion {} ::\n".format(port))
+logging.info("Ouverture du serveur socket au port "+str(port))
 
 Nb_Ph=Nb_photos()
-Nb_Clients=2
+Nb_Clients=1
 Client_fini=0
 Cpt=0
-T=hex(int(time.time()))[6:10]
+Rot=False
+
 threading._start_new_thread(clavier,())     # Lecture clavier sur un autre thread
-print(":: En attente des clients ::")
+logging.debug("En attente des connexions clients")
+
+threading._start_new_thread(mode_auto,())
 
 while etat==True:
     
@@ -168,36 +222,11 @@ while etat==True:
         Liste_IP.append(Adresse)
         time.sleep(0.5)
     
-    try :
-        threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
-        # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
-    except :
-        pass
-    
-    if Nb_Clients==len(Liste_Client):
-    
-        if Client_fini == len(Liste_IP):
-            # Dès que tout les clients ont pris leur photo, on réalise la rotation
-            Rot=True
-            m.Rotation(1./Nb_Ph)
-            Rot=False
-            # On réinitialise le compteur Client_fini et on incrémente Cpt de 1
-            Client_fini=0
-            Cpt+=1
-        
-        if Cpt==Nb_Ph:
-            # Dès que Cpt==Nb_Ph, ça veut dire qu'on a pris toute les photos
-            time.sleep(0.5)
-            # On attend juste une nouvelle valeur pour recommencer.
-            Nb_Ph=Nb_photos()
-            T=hex(int(time.time()))[6:10]
-            Cpt=0
-            
-        
-    
-
-        
-
+        try :
+            threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
+            # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
+        except :
+            pass
 
 for Client_Restant in Liste_Client :
     
@@ -207,8 +236,9 @@ for Client_Restant in Liste_Client :
     except:
         pass
 
+logging.info("Fermeture de la connexion avec les clients")
+
 serveur.close()     # Fermeture du serveur 
 m.Close_GPIO()      # Fermeture des GPIOs
 
-print("\n::::::::::::::::::::::::::")    
-print(":: Fermeture du Serveur ::\n::::::::::::::::::::::::::")
+logging.info("Fermeture du serveur socket")
