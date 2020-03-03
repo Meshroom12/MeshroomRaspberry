@@ -23,6 +23,33 @@ m.Init_GPIO()   # Initialisation des GPIOs
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
+def wait(Var_Bool,Condition_Bool):
+    while Var_Bool==Condition_Bool:
+        time.sleep(0.1)
+
+def clavier():
+    
+    global etat
+    
+    while etat==True:
+        if keyboard.press_and_release("q"):
+            etat=False
+            msg=b"stop"
+            Consigne_Clients(Liste_Client, msg)
+        # Pour sortir de la boucle il faut presser la touche 'q'
+            
+        if keyboard.press_and_release("l"):
+            print("\n:: Liste des clients connectés ::\n_______________________________________________________")
+            for addr in Liste_IP:
+                print("  Nom : {}\t".format(Lecture_Nom(addr[0])), "IP : {}\t".format(addr[0]), "Port : {}".format(addr[1]))
+            print("\n")
+            
+        if keyboard.press_and_release("p"):
+            wait(Rot,True)
+            msg=b"photo"
+            Consigne_Clients(Liste_Client, msg)
+    
+
 def Nb_photos():
     n=input("Nombre de photos : ")
     return n
@@ -53,6 +80,7 @@ def Lecture_Client(client,adresse):
     global Client_fini
     global Cpt
     global T
+    global Rot
     
     Nom=Lecture_Nom(adresse[0])
     i=0
@@ -121,60 +149,55 @@ print("::: Ouverture du Serveur :::")
 print(":: Port de connexion {} ::\n".format(port))
 
 Nb_Ph=Nb_photos()
+Nb_Clients=2
 Client_fini=0
 Cpt=0
 T=hex(int(time.time()))[6:10]
+threading._start_new_thread(clavier,())     # Lecture clavier sur un autre thread
+print(":: En attente des clients ::")
 
 while etat==True:
     
     Liste_Connexion, wlist, xlist = select.select([serveur],[],[],0.1)
     
-    if Client_fini == len(Liste_IP):
-        # Dès que tout les clients ont pris leur photo, on réalise la rotation
-        m.Rotation(1./Nb_Ph)
-        # On réinitialise le compteur Client_fini et on incrémente Cpt de 1
-        Client_fini=0
-        Cpt+=1
-    
-    if Cpt==Nb_Ph:
-        # Dès que Cpt==Nb_Ph, ça veut dire qu'on a pris toute les photos
-        time.sleep(0.5)
-        # On attend juste une nouvelle valeur pour recommencer.
-        Nb_Ph=Nb_photos()
-        T=hex(int(time.time()))[6:10]
-        Cpt=0
-    
-    if keyboard.is_pressed("q"):
-        etat=False
-        msg=b"stop"
-        Consigne_Clients(Liste_Client, msg)
-    # Pour sortir de la boucle il faut presser la touche 'q'
-        
-    if keyboard.is_pressed("p"):
-        msg=b"photo"
-        Consigne_Clients(Liste_Client, msg)
-        time.sleep(0.5)
-        
-    if keyboard.is_pressed("l"):
-        
-        print("\n:: Liste des clients connectés ::\n_______________________________________________________")
-        for addr in Liste_IP:
-            print("  Nom : {}\t".format(Lecture_Nom(addr[0])), "IP : {}\t".format(addr[0]), "Port : {}".format(addr[1]))
-        print("\n")
-    
     for Connexion in Liste_Connexion:
-        
+    
         Client, Adresse = serveur.accept()      # Ouverture d'une connexion
         Client_Co=Client.makefile('rb')
         Liste_Client.append(Client)
         Liste_IP.append(Adresse)
         time.sleep(0.5)
+    
+    try :
+        threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
+        # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
+    except :
+        pass
+    
+    if Nb_Clients==len(Liste_Client):
+    
+        if Client_fini == len(Liste_IP):
+            # Dès que tout les clients ont pris leur photo, on réalise la rotation
+            Rot=True
+            m.Rotation(1./Nb_Ph)
+            Rot=False
+            # On réinitialise le compteur Client_fini et on incrémente Cpt de 1
+            Client_fini=0
+            Cpt+=1
         
-        try :
-            threading._start_new_thread(Lecture_Client,(Client_Co,Adresse,))
-            # Nouveau thread pour la gestion de ce nouveau client (Appelle de la fonction de lecture)
-        except :
-            pass
+        if Cpt==Nb_Ph:
+            # Dès que Cpt==Nb_Ph, ça veut dire qu'on a pris toute les photos
+            time.sleep(0.5)
+            # On attend juste une nouvelle valeur pour recommencer.
+            Nb_Ph=Nb_photos()
+            T=hex(int(time.time()))[6:10]
+            Cpt=0
+            
+        
+    
+
+        
+
 
 for Client_Restant in Liste_Client :
     
